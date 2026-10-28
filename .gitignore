@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+travaux/
+exemples/*.pdf
+.env
+.DS_Store

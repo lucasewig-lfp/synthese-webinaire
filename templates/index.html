@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Synthèse de webinaire</title>
+<style>
+  :root { --bg:#f6f5f2; --card:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e3e1dc; --accent:#2f5d50; --accent-soft:#e6efeb; --err:#a33; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:40px 16px 80px; }
+  h1 { font-size:26px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 28px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:16px; }
+  .card h2 { font-size:15px; margin:0 0 12px; display:flex; gap:10px; align-items:center; }
+  .num { width:24px; height:24px; border-radius:50%; background:var(--accent); color:#fff; font-size:13px; display:inline-grid; place-items:center; }
+  .drop { border:2px dashed var(--line); border-radius:10px; padding:28px; text-align:center; color:var(--muted); cursor:pointer; transition:.15s; }
+  .drop.over, .drop:hover { border-color:var(--accent); background:var(--accent-soft); }
+  .drop strong { color:var(--ink); }
+  .hint { color:var(--muted); font-size:13px; margin-top:8px; }
+  .ex { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--line); }
+  .ex:last-child { border-bottom:0; }
+  .ex label { flex:1; cursor:pointer; overflow-wrap:anywhere; }
+  .ex button { background:none; border:0; color:var(--muted); cursor:pointer; font-size:16px; }
+  textarea, select, input[type=password] { width:100%; font:inherit; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  textarea { min-height:110px; resize:vertical; }
+  .row { display:flex; gap:12px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  .row select { width:auto; }
+  .btn { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:11px 18px; font:inherit; font-weight:600; cursor:pointer; text-decoration:none; display:inline-block; }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .btn.ghost { background:var(--accent-soft); color:var(--accent); }
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin:10px 0; }
+  .bar div { height:100%; background:var(--accent); width:0; transition:width .4s; }
+  .err { color:var(--err); white-space:pre-wrap; }
+  .preview { max-height:420px; overflow:auto; background:var(--bg); border-radius:8px; padding:14px; white-space:pre-wrap; font-size:13.5px; margin-top:14px; }
+  .banner { background:#fff6e0; border-color:#f0dca8; }
+  .hidden { display:none; }
+  .cmd { background:#1d1d1f; color:#f6f5f2; padding:10px 12px; border-radius:8px; font:13px ui-monospace, Menlo, monospace; overflow-x:auto; user-select:all; margin:6px 0 14px; }
+  #claudeCard p { margin:0; }
+  .linkish { background:none; border:0; color:var(--accent); cursor:pointer; padding:0; font:inherit; text-decoration:underline; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Synthèse de webinaire</h1>
+  <p class="sub">Dépose l'enregistrement, choisis tes exemples de synthèse, ajoute des consignes, puis récupère un fichier Word modifiable.</p>
+
+  <section class="card banner hidden" id="claudeCard">
+    <h2>Connexion à Claude</h2>
+    <p class="hint" style="margin-top:0">La rédaction utilise ton abonnement Claude (Pro ou Max) via Claude Code. Pas de clé API. À faire une seule fois :</p>
+    <div id="stepInstall">
+      <p>1. Ouvre l'app <strong>Terminal</strong> et colle cette commande pour installer Claude Code :</p>
+      <pre class="cmd">curl -fsSL https://claude.ai/install.sh | bash</pre>
+    </div>
+    <div id="stepLogin">
+      <p><span id="loginNum">2</span>. Toujours dans le Terminal, connecte-toi à ton compte Claude (une page s'ouvre dans ton navigateur) :</p>
+      <pre class="cmd">~/.local/bin/claude auth login</pre>
+    </div>
+    <div class="row"><button class="btn" id="recheck">C'est fait, vérifier</button><span class="hint" id="claudeMsg" style="margin:0"></span></div>
+  </section>
+
+  <section id="form">
+    <div class="card">
+      <h2><span class="num">1</span>Le webinaire</h2>
+      <div class="drop" id="drop"><strong>Glisse la vidéo ou l'audio ici</strong><br>ou clique pour choisir (mp4, mov, mp3, m4a, wav… ou une transcription .txt)</div>
+      <input type="file" id="media" accept="video/*,audio/*,.txt" hidden>
+      <div class="row">
+        <span class="hint" style="margin:0">Langue parlée :</span>
+        <select id="language"><option value="fr">Français</option><option value="en">Anglais</option><option value="auto">Détection automatique</option></select>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="num">2</span>Exemples de synthèse (PDF)</h2>
+      <div id="examples"></div>
+      <p class="hint" id="noEx">Aucun exemple enregistré pour l'instant.</p>
+      <button class="btn ghost" id="addEx">+ Ajouter des PDF</button>
+      <input type="file" id="exInput" accept="application/pdf" multiple hidden>
+      <p class="hint">Les exemples restent enregistrés pour les prochaines fois. Coche ceux à imiter.</p>
+    </div>
+
+    <div class="card">
+      <h2><span class="num">3</span>Consignes</h2>
+      <textarea id="prompt" placeholder="Ex. : synthèse de 2 pages max pour des conseillers en gestion de patrimoine, mets en avant les chiffres clés et les actions à retenir, ton factuel."></textarea>
+      <div class="row"><button class="btn" id="go">Lancer la synthèse</button><span class="err" id="formErr"></span></div>
+    </div>
+  </section>
+
+  <section class="card hidden" id="jobCard">
+    <h2 id="jobTitle">Traitement</h2>
+    <div class="bar"><div id="barFill"></div></div>
+    <p id="step" class="hint"></p>
+    <p class="hint" id="keepOpen">Tu peux laisser cet onglet ouvert : compte quelques minutes de transcription pour 3 h de vidéo, puis quelques minutes de rédaction.</p>
+    <div id="result" class="hidden">
+      <div class="row">
+        <a class="btn" id="dlDocx">Télécharger le Word (.docx)</a>
+        <a class="btn ghost" id="dlTxt">Transcription (.txt)</a>
+        <a class="btn ghost" id="dlMd">Markdown</a>
+      </div>
+      <p class="hint">Le .docx s'ouvre dans Word, Pages ou Google Docs (Fichier → Ouvrir → Importer).</p>
+      <div class="preview" id="preview"></div>
+      <h2 style="margin-top:20px">Pas satisfait ? Refaire avec d'autres consignes</h2>
+      <textarea id="prompt2"></textarea>
+      <div class="row"><button class="btn" id="regen">Régénérer (sans retranscrire)</button><button class="linkish" id="restart">Nouveau webinaire</button></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let mediaFile = null, currentJob = null;
+
+async function api(url, opts = {}) {
+  const r = await fetch(url, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || `Erreur ${r.status}`);
+  return data;
+}
+
+// connexion Claude Code
+async function checkClaude(manual) {
+  $('claudeMsg').textContent = manual ? 'Vérification…' : '';
+  const s = await api('/api/claude');
+  $('claudeCard').classList.toggle('hidden', s.logged_in);
+  $('stepInstall').classList.toggle('hidden', s.installed);
+  $('loginNum').textContent = s.installed ? '1' : '2';
+  if (manual && !s.logged_in) $('claudeMsg').textContent = s.installed ? 'Claude Code est installé mais pas encore connecté.' : 'Claude Code n\'est pas encore installé.';
+}
+$('recheck').onclick = () => checkClaude(true);
+
+// fichier du webinaire
+function setMedia(f) {
+  mediaFile = f;
+  $('drop').innerHTML = `<strong>${f.name}</strong><br>${(f.size / 1e6).toFixed(0)} Mo · clique pour changer`;
+}
+$('drop').onclick = () => $('media').click();
+$('media').onchange = e => e.target.files[0] && setMedia(e.target.files[0]);
+['dragover', 'dragenter'].forEach(t => $('drop').addEventListener(t, e => { e.preventDefault(); $('drop').classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => $('drop').addEventListener(t, e => { e.preventDefault(); $('drop').classList.remove('over'); }));
+$('drop').addEventListener('drop', e => e.dataTransfer.files[0] && setMedia(e.dataTransfer.files[0]));
+
+// exemples
+function selectedExamples() {
+  return [...document.querySelectorAll('#examples input:checked')].map(i => i.value);
+}
+function renderExamples(names, check = []) {
+  const keep = new Set([...selectedExamples(), ...check]);
+  $('noEx').classList.toggle('hidden', names.length > 0);
+  $('examples').innerHTML = '';
+  names.forEach(n => {
+    const row = document.createElement('div');
+    row.className = 'ex';
+    const id = 'ex-' + btoa(unescape(encodeURIComponent(n))).replace(/=/g, '');
+    row.innerHTML = `<input type="checkbox" id="${id}"><label for="${id}"></label><button title="Supprimer">✕</button>`;
+    row.querySelector('input').value = n;
+    row.querySelector('input').checked = keep.has(n) || names.length === 1;
+    row.querySelector('label').textContent = n;
+    row.querySelector('button').onclick = async () => {
+      if (confirm(`Supprimer l'exemple « ${n} » ?`)) renderExamples(await api('/api/examples/' + encodeURIComponent(n), { method: 'DELETE' }));
+    };
+    $('examples').appendChild(row);
+  });
+}
+$('addEx').onclick = () => $('exInput').click();
+$('exInput').onchange = async e => {
+  const fd = new FormData();
+  [...e.target.files].forEach(f => fd.append('files', f));
+  const res = await api('/api/examples', { method: 'POST', body: fd });
+  renderExamples(res.all, res.added);
+  e.target.value = '';
+};
+
+// lancement
+$('go').onclick = async () => {
+  $('formErr').textContent = '';
+  if (!mediaFile) return $('formErr').textContent = 'Ajoute le fichier du webinaire.';
+  const fd = new FormData();
+  fd.append('media', mediaFile);
+  fd.append('prompt', $('prompt').value);
+  fd.append('language', $('language').value);
+  selectedExamples().forEach(n => fd.append('examples', n));
+  $('go').disabled = true;
+  $('formErr').textContent = 'Envoi du fichier…';
+  try {
+    const { id } = await api('/api/jobs', { method: 'POST', body: fd });
+    $('formErr').textContent = '';
+    follow(id, mediaFile.name);
+  } catch (e) { $('formErr').textContent = e.message; }
+  $('go').disabled = false;
+};
+
+function follow(id, label) {
+  currentJob = id;
+  $('form').classList.add('hidden');
+  $('jobCard').classList.remove('hidden');
+  $('result').classList.add('hidden');
+  $('keepOpen').classList.remove('hidden');
+  $('jobTitle').textContent = label;
+  $('step').classList.remove('err');
+  const tick = async () => {
+    const j = await api('/api/jobs/' + id);
+    $('barFill').style.width = j.progress + '%';
+    $('step').textContent = j.step;
+    if (j.status === 'running') return setTimeout(tick, 1500);
+    $('keepOpen').classList.add('hidden');
+    if (j.status === 'error') {
+      $('step').classList.add('err');
+      if (j.has_transcript) showResult(id, j, true);
+      return;
+    }
+    showResult(id, j, false);
+  };
+  tick();
+}
+
+function showResult(id, j, transcriptOnly) {
+  $('result').classList.remove('hidden');
+  $('dlDocx').href = `/api/jobs/${id}/docx`;
+  $('dlMd').href = `/api/jobs/${id}/md`;
+  $('dlTxt').href = `/api/jobs/${id}/transcription`;
+  $('dlDocx').classList.toggle('hidden', transcriptOnly);
+  $('dlMd').classList.toggle('hidden', transcriptOnly);
+  $('preview').classList.toggle('hidden', transcriptOnly);
+  $('preview').textContent = j.preview;
+  $('prompt2').value = $('prompt').value;
+}
+
+$('regen').onclick = async () => {
+  try {
+    const { id } = await api(`/api/jobs/${currentJob}/regenerate`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: $('prompt2').value, examples: selectedExamples() }),
+    });
+    $('prompt').value = $('prompt2').value;
+    follow(id, $('jobTitle').textContent);
+  } catch (e) { $('step').textContent = e.message; $('step').classList.add('err'); }
+};
+$('restart').onclick = () => { $('jobCard').classList.add('hidden'); $('form').classList.remove('hidden'); };
+
+checkClaude(false);
+api('/api/examples').then(n => renderExamples(n));
+</script>
+</body>
+</html>
